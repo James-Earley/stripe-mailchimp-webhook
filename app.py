@@ -37,14 +37,14 @@ def stripe_webhook():
     if event['type'] in ['checkout.session.completed', 'charge.succeeded']:
         session = event['data']['object']
 
-        # Extract billing details
-        billing_details = session.get('billing_details', {})
-        address = billing_details.get('address', {})
+        # ✅ Extract from customer_details
+        customer_details = session.get('customer_details', {})
+        address = customer_details.get('address', {})
 
         # Extract customer data
-        email = billing_details.get('email', None)
-        full_name = billing_details.get('name', 'Unknown')
-        amount = session.get('amount', 0) / 100  # Convert from cents/pence to currency
+        email = customer_details.get('email')
+        full_name = customer_details.get('name', 'Unknown')
+        amount = session.get('amount_total', 0) / 100  # Convert from cents/pence to currency
 
         # Skip if email is missing
         if not email:
@@ -88,7 +88,7 @@ def add_to_mailchimp(email, first_name, last_name, amount, address):
             'FNAME': first_name,
             'LNAME': last_name,
             'DONATION': amount,
-            'ADDRESS': address
+            'ADDRESS': address  # Pass structured address
         }
     }
 
