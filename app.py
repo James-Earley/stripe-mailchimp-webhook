@@ -33,25 +33,40 @@ def stripe_webhook():
     except stripe.error.SignatureVerificationError as e:
         return jsonify({'error': 'Invalid signature'}), 400
 
-    if event['type'] == 'checkout.session.completed':
+    # Handle relevant Stripe events
+    if event['type'] in ['checkout.session.completed', 'charge.succeeded']:
         session = event['data']['object']
 
-        # Extract customer details
-        email = session['customer_details']['email']
-        full_name = session['customer_details']['name']
-        address = session['customer_details']['address']
-        amount = session['amount_total'] / 100  # Convert cents to dollars
+        # Extract billing details
+        billing_details = session.get('billing_details', {})
+        address = billing_details.get('address', {})
 
-        # Split full name into first and last name
-        if full_name:
-            name_parts = full_name.split(' ', 1)
-            first_name = name_parts[0]
-            last_name = name_parts[1] if len(name_parts) > 1 else ''
+        # Extract customer data
+        email = billing_details.get('email', 'noemail@example.com')
+        full_name = billing_details.get('name', 'Unknown')
+        amount = session.get('amount', 0) / 100  # Convert from cents/pence to currency
 
-        # Add to Mailchimp with full details
-        add_to_mailchimp(email, first_name, last_name, amount, address)
+        # Split full name into first and last names
+        name_parts = full_name.split(' ', 1)
+        first_name = name_parts[0]
+        last_name = name_parts[1] if len(name_parts) > 1 else ''
+
+        # Prepare the address for Mailchimp
+        mailchimp_address = {
+            "addr1": address.get("line1", "N/A"),  # Required field
+            "addr2": address.get("line2", ""),
+            "city": address.get("city", ""),
+            "state": address.get("state", ""),
+            "zip": address.get("postal_code", ""),
+            "country": address.get("country", "GB")  # Default to GB if missing
+        }
+
+        # Send data to Mailchimp
+        add_to_mailchimp(email, first_name, last_name, amount, mailchimp_address)
 
         return jsonify({'status': 'success'}), 200
+
+    return jsonify({'status': 'ignored event type'}), 200
 
 def add_to_mailchimp(email, first_name, last_name, amount, address):
     url = f'https://{MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/lists/{MAILCHIMP_LIST_ID}/members'
@@ -60,16 +75,7 @@ def add_to_mailchimp(email, first_name, last_name, amount, address):
         'Content-Type': 'application/json'
     }
 
-    # Prepare the address for Mailchimp format
-    mailchimp_address = {
-        "addr1": address.get("line1", "N/A"),
-        "addr2": address.get("line2", ""),
-        "city": address.get("city", ""),
-        "state": address.get("state", ""),
-        "zip": address.get("postal_code", ""),
-        "country": address.get("country", "UK")
-    }
-
+    # Prepare Mailchimp data payload
     data = {
         'email_address': email,
         'status': 'subscribed',
@@ -77,15 +83,16 @@ def add_to_mailchimp(email, first_name, last_name, amount, address):
             'FNAME': first_name,
             'LNAME': last_name,
             'DONATION': amount,
-            'ADDRESS': mailchimp_address
+            'ADDRESS': address  # Pass structured address
         }
     }
 
+    # Send to Mailchimp
     response = requests.post(url, json=data, headers=headers)
-    if response.status_code == 200:
-        print(f"Added {email} to Mailchimp.")
+    if response.status_code == 200 or response.status_code == 204:
+        print(f"✅ Successfully added {email} to Mailchimp.")
     else:
-        print(f"Failed to add {email}: {response.text}")
+        print(f"❌ Failed to add {email} to Mailchimp: {response.text}")
 
 if __name__ == '__main__':
     app.run(port=5000)
