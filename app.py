@@ -28,9 +28,9 @@ def stripe_webhook():
         event = stripe.Webhook.construct_event(
             payload, sig_header, STRIPE_WEBHOOK_SECRET
         )
-    except ValueError as e:
+    except ValueError:
         return jsonify({'error': 'Invalid payload'}), 400
-    except stripe.error.SignatureVerificationError as e:
+    except stripe.error.SignatureVerificationError:
         return jsonify({'error': 'Invalid signature'}), 400
 
     # Handle relevant Stripe events
@@ -42,9 +42,14 @@ def stripe_webhook():
         address = billing_details.get('address', {})
 
         # Extract customer data
-        email = billing_details.get('email', 'noemail@example.com')
+        email = billing_details.get('email', None)
         full_name = billing_details.get('name', 'Unknown')
         amount = session.get('amount', 0) / 100  # Convert from cents/pence to currency
+
+        # Skip if email is missing
+        if not email:
+            print("⚠️ No email provided. Skipping Mailchimp addition.")
+            return jsonify({'status': 'no email'}), 200
 
         # Split full name into first and last names
         name_parts = full_name.split(' ', 1)
@@ -83,13 +88,13 @@ def add_to_mailchimp(email, first_name, last_name, amount, address):
             'FNAME': first_name,
             'LNAME': last_name,
             'DONATION': amount,
-            'ADDRESS': address  # Pass structured address
+            'ADDRESS': address
         }
     }
 
     # Send to Mailchimp
     response = requests.post(url, json=data, headers=headers)
-    if response.status_code == 200 or response.status_code == 204:
+    if response.status_code in [200, 204]:
         print(f"✅ Successfully added {email} to Mailchimp.")
     else:
         print(f"❌ Failed to add {email} to Mailchimp: {response.text}")
