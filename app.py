@@ -62,12 +62,12 @@ def add_to_mailchimp(email, first_name, last_name, amount, address):
 
     # Prepare the address for Mailchimp format
     mailchimp_address = {
-        "addr1": address.get("line1", ""),
+        "addr1": address.get("line1", "N/A"),
         "addr2": address.get("line2", ""),
         "city": address.get("city", ""),
         "state": address.get("state", ""),
         "zip": address.get("postal_code", ""),
-        "country": address.get("country", "")
+        "country": address.get("country", "UK")
     }
 
     data = {
