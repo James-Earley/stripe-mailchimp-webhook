@@ -56,20 +56,20 @@ def stripe_webhook():
         first_name = name_parts[0]
         last_name = name_parts[1] if len(name_parts) > 1 else ''
 
-        # ✅ Prepare the address following Mailchimp schema with defaults
+        # ✅ Prepare the address following Mailchimp schema
         mailchimp_address = {
-            "addr1": address.get("line1", "Unknown Street"),  # Default to "Unknown Street" if missing
+            "addr1": (address.get("line1", "Unknown Street") or "").strip(", "),  # Required
             "addr2": address.get("line2", ""),
-            "city": address.get("city", "Unknown City"),      # Default to "Unknown City" if missing
-            "state": address.get("state", ""),                # Optional unless US
-            "zip": address.get("postal_code", "00000"),       # Default to "00000" if missing
-            "country": address.get("country", "GB")           # Default to GB if missing
+            "city": address.get("city", "Unknown City"),      # Required
+            "state": address.get("state", ""),                # Optional (required for US)
+            "zip": address.get("postal_code", "00000"),       # Required
+            "country": address.get("country", "GB")           # Optional but recommended
         }
 
-        # ✅ Remove empty fields to avoid validation errors
+        # ✅ Remove empty fields and ensure all required fields are set
         mailchimp_address = {k: v for k, v in mailchimp_address.items() if v}
 
-        # ✅ Log address for debugging
+        # ✅ Log cleaned address for debugging
         print("📦 Mailchimp Address Payload (Cleaned):", mailchimp_address)
 
         # Send data to Mailchimp
@@ -80,7 +80,7 @@ def stripe_webhook():
     return jsonify({'status': 'ignored event type'}), 200
 
 def add_to_mailchimp(email, first_name, last_name, amount, address):
-    # Use skip_merge_validation=true to bypass required fields check
+    # Use skip_merge_validation=true to bypass optional field checks
     url = f'https://{MAILCHIMP_SERVER_PREFIX}.api.mailchimp.com/3.0/lists/{MAILCHIMP_LIST_ID}/members?skip_merge_validation=true'
     headers = {
         'Authorization': f'Bearer {MAILCHIMP_API_KEY}',
