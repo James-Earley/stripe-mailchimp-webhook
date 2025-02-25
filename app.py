@@ -56,21 +56,18 @@ def stripe_webhook():
         first_name = name_parts[0]
         last_name = name_parts[1] if len(name_parts) > 1 else ''
 
-        # ✅ Prepare the address following Mailchimp schema
+        # ✅ Ensure all required and optional address fields exist
         mailchimp_address = {
             "addr1": (address.get("line1", "Unknown Street") or "").strip(", "),  # Required
-            "addr2": address.get("line2", ""),
-            "city": address.get("city", "Unknown City"),      # Required
-            "state": address.get("state", ""),                # Optional (required for US)
-            "zip": address.get("postal_code", "00000"),       # Required
-            "country": address.get("country", "GB")           # Optional but recommended
+            "addr2": address.get("line2", ""),                                     # Optional but key required
+            "city": address.get("city", "Unknown City"),                          # Required
+            "state": address.get("state", ""),                                    # Optional but key required
+            "zip": address.get("postal_code", "00000"),                           # Required
+            "country": address.get("country", "GB")                               # Required
         }
 
-        # ✅ Remove empty fields and ensure all required fields are set
-        mailchimp_address = {k: v for k, v in mailchimp_address.items() if v}
-
-        # ✅ Log cleaned address for debugging
-        print("📦 Mailchimp Address Payload (Cleaned):", mailchimp_address)
+        # ✅ Log the final address for debugging
+        print("📦 Mailchimp Address Payload (Full Schema):", mailchimp_address)
 
         # Send data to Mailchimp
         add_to_mailchimp(email, first_name, last_name, amount, mailchimp_address)
